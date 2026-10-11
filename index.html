@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mandala</title>
+<style>
+:root{--bg:#e7eaf0;--panel:#f8f9fb;--ink:#1f2430;--mute:#5d6577;--line:#cfd4de;--acc:#3b4cca;--accink:#fff;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#14161c;--panel:#1d2029;--ink:#e8eaf0;--mute:#9aa2b5;--line:#343949;--acc:#8e9bff;--accink:#14161c}}
+:root[data-theme="dark"]{--bg:#14161c;--panel:#1d2029;--ink:#e8eaf0;--mute:#9aa2b5;--line:#343949;--acc:#8e9bff;--accink:#14161c}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{height:100%;margin:0;display:flex;background:var(--bg);color:var(--ink);font:15px/1.3 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden}
+body.right{flex-direction:row-reverse}
+#panel{flex:none;width:clamp(128px,26vw,168px);box-sizing:border-box;background:var(--panel);padding:12px 10px;overflow-y:auto;touch-action:pan-y;display:flex;flex-direction:column;gap:16px;border:0 solid var(--line)}
+body:not(.right) #panel{border-right-width:1px}
+body.right #panel{border-left-width:1px}
+h2{margin:0 0 6px;font-size:13px;font-weight:600;color:var(--mute)}
+button{font:inherit;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:10px;min-height:42px;padding:6px 8px;cursor:pointer;touch-action:manipulation}
+button:focus-visible,input:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+button.on{background:var(--acc);border-color:var(--acc);color:var(--accink)}
+#times,.row{display:grid;gap:6px}
+#sw{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
+@media (min-width:700px){#sw{grid-template-columns:repeat(4,1fr)}}
+#sw button{aspect-ratio:1;min-height:0;padding:0;border-radius:50%}
+#sw button.on{box-shadow:0 0 0 3px var(--panel),0 0 0 5px var(--acc)}
+#pick{width:100%;height:38px;margin-top:8px;padding:0;border:1px solid var(--line);border-radius:10px;background:none}
+#sz{width:100%;margin:6px 0}
+#dotbox{height:44px;display:grid;place-items:center}
+#dot{border-radius:50%;background:#e63946}
+#stage{flex:1;min-width:0;min-height:0;display:grid;place-items:center;touch-action:none}
+#wrap{position:relative;background:#fff;border-radius:6px;box-shadow:0 2px 14px rgba(0,0,0,.18);overflow:hidden}
+#wrap canvas{position:absolute;inset:0;width:100%;height:100%}
+#col{touch-action:none;cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Cpath d='M2 30l2-8 17-17 6 6-17 17z' fill='%23f5c542' stroke='%23222' stroke-width='1.5' stroke-linejoin='round'/%3E%3Cpath d='M2 30l2-8 6 6z' fill='%23222'/%3E%3C/svg%3E") 2 30,crosshair}
+#col.fill{cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Cpath d='M8 12l8-8 10 10-8 8z' fill='%233b4cca' stroke='%23222' stroke-width='1.5' stroke-linejoin='round'/%3E%3Cpath d='M5 20c2 3 3 5 3 6a3 3 0 0 1-6 0c0-1 1-3 3-6z' fill='%233b4cca' stroke='%23222' stroke-width='1.2'/%3E%3C/svg%3E") 5 30,pointer}
+#lin{pointer-events:none}
+@media (prefers-reduced-motion:no-preference){#wrap{transition:opacity .15s}}
+</style>
+</head>
+<body>
+<div id="panel">
+  <section><h2>Mandala size</h2>
+    <div id="times">
+      <button data-t="5">5 min</button><button data-t="15">15 min</button>
+      <button data-t="30">30 min</button><button data-t="60">1 hour</button>
+    </div>
+  </section>
+  <section><h2>Color</h2><div id="sw"></div><input type="color" id="pick" value="#d62828" aria-label="Custom color"></section>
+  <section><h2>Brush size</h2><input type="range" id="sz" min="2" max="40" value="10" aria-label="Brush size"><div id="dotbox"><div id="dot"></div></div></section>
+  <section><div class="row">
+    <button id="fl">Fill</button><button id="er">Eraser</button><button id="un">Undo</button>
+    <button id="sym">Mirror</button><button id="side">Move panel</button>
+  </div></section>
+</div>
+<div id="stage"><div id="wrap"><canvas id="col"></canvas><canvas id="lin"></canvas></div></div>
+<script>
+const $=s=>document.querySelector(s);
+const wrap=$('#wrap'),cc=$('#col'),lc=$('#lin'),cx=cc.getContext('2d'),lx=lc.getContext('2d');
+const LV={5:{r:3,n:8},15:{r:5,n:12},30:{r:7,n:16},60:{r:10,n:24}};
+const PAL=['#d62828','#9b1d3a','#ff4d6d','#f78fb3','#e056c1','#b5179e','#7209b7','#5a189a','#9d4edd','#c8a2ff','#3a0ca3','#4361ee','#0077b6','#4cc9f0','#00b4d8','#0a9396','#2ec4b6','#06d6a0','#38b000','#2d6a4f','#80b918','#d4e157','#ffd60a','#ffb703','#fb8500','#ff6b35','#e85d04','#f4a261','#ffcba4','#bc6c25','#8d5524','#5e3023','#d4a017','#e5989b','#1b263b','#99d98c'];
+let level=15,seed=Math.random()*1e9|0,color=PAL[0],size=10,erase=false,mirror=false,S=0,dpr=1,hist=[],last=null,fillMode=false;
+
+function rng(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+
+function shape(t,r0,r1,n,fl){
+  const m=(r0+r1)/2,s=Math.sin(Math.PI/n)*.92,w=m*s,wa=r0*s,wb=r1*s,a=Math.PI/n*.94;
+  lx.beginPath();
+  if(t==0){lx.moveTo(r0,0);lx.quadraticCurveTo(m,w*1.9,r1,0);lx.quadraticCurveTo(m,-w*1.9,r0,0)}
+  else if(t==1){lx.arc(m,0,Math.min((r1-r0)/2,w)*.85,0,7)}
+  else if(t==2){if(fl){lx.moveTo(r1,-wb);lx.lineTo(r0,0);lx.lineTo(r1,wb)}else{lx.moveTo(r0,-wa);lx.lineTo(r1,0);lx.lineTo(r0,wa)}lx.closePath()}
+  else if(t==3){lx.arc(0,0,r1,-a,a);lx.arc(0,0,r0,a,-a,true);lx.closePath()}
+  else if(t==4){lx.moveTo(r0,0);lx.lineTo(m,w);lx.lineTo(r1,0);lx.lineTo(m,-w);lx.closePath()}
+  else{lx.moveTo(r0,0);lx.lineTo(r1*Math.cos(a),-r1*Math.sin(a));lx.arc(0,0,r1,-a,a);lx.closePath()}
+  lx.stroke();
+}
+
+function drawLines(){
+  const {r:R,n}=LV[level],rnd=rng(seed),c=S/2,max=c*.96,core=max*.1,step=(max-core)/R;
+  lx.setTransform(dpr,0,0,dpr,0,0);lx.clearRect(0,0,S,S);
+  lx.strokeStyle='#222';lx.lineJoin=lx.lineCap='round';
+  lx.save();lx.translate(c,c);
+  const ring=(r,lw)=>{lx.lineWidth=lw;lx.beginPath();lx.arc(0,0,r,0,7);lx.stroke()};
+  const place=(t,r0,r1,off,fl,nest)=>{
+    for(let k=0;k<n;k++){
+      lx.save();lx.rotate(off+k*2*Math.PI/n);
+      lx.lineWidth=1.5;shape(t,r0,r1,n,fl);
+      if(nest){const m=(r0+r1)/2;lx.translate(m,0);lx.scale(.55,.55);lx.translate(-m,0);lx.lineWidth=2.4;shape(t,r0,r1,n,fl)}
+      lx.restore();
+    }
+  };
+  place(0,0,core,0,0,false);
+  ring(core,2);
+  for(let i=0;i<R;i++){
+    const r0=core+step*i,r1=r0+step,t=rnd()*6|0;
+    place(t,r0,r1,i%2?Math.PI/n:0,rnd()>.5,rnd()>.55);
+    ring(r1,i==R-1?3:1.8);
+  }
+  lx.restore();
+}
+
+function fit(){
+  const st=$('#stage'),s=Math.floor(Math.min(st.clientWidth,st.clientHeight)-16);
+  if(s<50||s===S)return;
+  const old=document.createElement('canvas');old.width=cc.width;old.height=cc.height;
+  if(cc.width)old.getContext('2d').drawImage(cc,0,0);
+  S=s;dpr=window.devicePixelRatio||1;
+  wrap.style.width=wrap.style.height=s+'px';
+  cc.width=cc.height=lc.width=lc.height=Math.round(s*dpr);
+  cx.setTransform(dpr,0,0,dpr,0,0);
+  if(old.width)cx.drawImage(old,0,0,s,s);
+  hist=[];drawLines();
+}
+
+function regen(t){
+  level=t;seed=Math.random()*1e9|0;hist=[];
+  cx.save();cx.setTransform(1,0,0,1,0,0);cx.clearRect(0,0,cc.width,cc.height);cx.restore();
+  drawLines();
+  document.querySelectorAll('#times button').forEach(b=>b.classList.toggle('on',b.dataset.t==t));
+}
+
+function seg(a,b,w){
+  const k=mirror?LV[level].n:1;
+  cx.save();cx.lineCap=cx.lineJoin='round';cx.lineWidth=w;cx.strokeStyle=color;
+  cx.globalCompositeOperation=erase?'destination-out':'source-over';
+  for(let i=0;i<k;i++){
+    cx.save();cx.translate(S/2,S/2);cx.rotate(i*2*Math.PI/k);cx.translate(-S/2,-S/2);
+    cx.beginPath();cx.moveTo(a[0],a[1]);cx.lineTo(b[0],b[1]);cx.stroke();cx.restore();
+  }
+  cx.restore();
+}
+const P=e=>{const r=cc.getBoundingClientRect();return[(e.clientX-r.left)*S/r.width,(e.clientY-r.top)*S/r.height]};
+const wd=e=>size*(e.pointerType==='pen'&&e.pressure>0?.3+e.pressure*1.1:1);
+cc.addEventListener('pointerdown',e=>{
+  e.preventDefault();
+  if(fillMode){fillAt(P(e));return}
+  cc.setPointerCapture(e.pointerId);
+  hist.push(cx.getImageData(0,0,cc.width,cc.height));if(hist.length>12)hist.shift();
+  last=P(e);seg(last,last,wd(e));
+});
+cc.addEventListener('pointermove',e=>{if(!last)return;e.preventDefault();const p=P(e);seg(last,p,wd(e));last=p});
+['pointerup','pointercancel'].forEach(t=>cc.addEventListener(t,()=>{last=null}));
+
+function fillAt(p){
+  const w=cc.width,h=cc.height,x0=Math.round(p[0]*dpr),y0=Math.round(p[1]*dpr);
+  if(x0<0||y0<0||x0>=w||y0>=h)return;
+  const L=lx.getImageData(0,0,w,h).data,ok=i=>L[i*4+3]<140;
+  if(!ok(y0*w+x0))return;
+  hist.push(cx.getImageData(0,0,w,h));if(hist.length>12)hist.shift();
+  const C=cx.getImageData(0,0,w,h),D=C.data,seen=new Uint8Array(w*h),st=[x0,y0],rgb=[1,3,5].map(i=>parseInt(color.slice(i,i+2),16));
+  while(st.length){
+    const y=st.pop(),x=st.pop();
+    let l=x;while(l>=0&&!seen[y*w+l]&&ok(y*w+l))l--;l++;
+    let up=false,dn=false;
+    for(let i=l;i<w&&!seen[y*w+i]&&ok(y*w+i);i++){
+      seen[y*w+i]=1;const o=(y*w+i)*4;
+      if(erase){D[o+3]=0}else{D[o]=rgb[0];D[o+1]=rgb[1];D[o+2]=rgb[2];D[o+3]=255}
+      if(y>0){const k=(y-1)*w+i,f=!seen[k]&&ok(k);if(f&&!up)st.push(i,y-1);up=f}
+      if(y<h-1){const k=(y+1)*w+i,f=!seen[k]&&ok(k);if(f&&!dn)st.push(i,y+1);dn=f}
+    }
+  }
+  cx.putImageData(C,0,0);
+}
+function dot(){const d=$('#dot');d.style.width=d.style.height=size+'px';d.style.background=erase?'#fff':color;d.style.border=erase?'1px solid #888':'0'}
+function setColor(c){color=c;erase=false;$('#er').classList.remove('on');document.querySelectorAll('#sw button').forEach(b=>b.classList.toggle('on',b.dataset.c==c));dot()}
+
+PAL.forEach(c=>{const b=document.createElement('button');b.dataset.c=c;b.style.background=c;b.setAttribute('aria-label','Color '+c);b.onclick=()=>{$('#pick').value=c;setColor(c)};$('#sw').appendChild(b)});
+$('#pick').oninput=e=>setColor(e.target.value);
+$('#sz').oninput=e=>{size=+e.target.value;dot()};
+$('#er').onclick=()=>{erase=!erase;$('#er').classList.toggle('on',erase);dot()};
+$('#un').onclick=()=>{const h=hist.pop();if(h)cx.putImageData(h,0,0)};
+$('#fl').onclick=()=>{fillMode=!fillMode;$('#fl').classList.toggle('on',fillMode);cc.classList.toggle('fill',fillMode)};
+$('#sym').onclick=()=>{mirror=!mirror;$('#sym').classList.toggle('on',mirror)};
+$('#side').onclick=()=>{document.body.classList.toggle('right');try{localStorage.setItem('mandala-side',document.body.classList.contains('right')?'r':'l')}catch(e){}};
+document.querySelectorAll('#times button').forEach(b=>b.onclick=()=>regen(+b.dataset.t));
+try{if(localStorage.getItem('mandala-side')==='r')document.body.classList.add('right')}catch(e){}
+
+new ResizeObserver(fit).observe($('#stage'));
+fit();regen(15);setColor(PAL[0]);
+</script>
+</body>
+</html>
